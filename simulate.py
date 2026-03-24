@@ -5,6 +5,8 @@ from strategy import NuggetStrategy
 # DO NOT CHANGE IT!
 df = pd.read_parquet("./data/cache/normalized.parquet")
 df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-bt = FractionalBacktest(df, NuggetStrategy, cash=1000, commission=.002, margin=1.0)
+bt = FractionalBacktest(df, NuggetStrategy, cash=1000, commission=.002, margin=1.0, trade_on_close=True, finalize_trades=True)
 stats = bt.run()
 print(stats.drop(['_strategy', '_equity_curve', '_trades']))
+# print(stats._trades)
+# bt.plot()

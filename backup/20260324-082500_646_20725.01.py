@@ -29,20 +29,20 @@ def atr(high, low, close, n):
 
 
 class NuggetStrategy(Strategy):
-    trend_n = 60
+    trend_n = 70
     breakout_n = 18
     exit_n = 12
-    atr_n = 7
+    atr_n = 20
 
     # ATR-based position sizing: risk X% of equity per trade
-    risk_pct = 0.015
+    risk_pct = 0.04
     atr_mult = 0.8          # SL = atr_mult * ATR from entry
-    min_vol = 0.002
+    min_vol = 0.004
     max_vol = 0.08
 
-    rebalance_every = 6
+    rebalance_every = 10
     rebalance_portion = 0.05
-    rebalance_topup = 0.01
+    rebalance_topup = 0.02
     
     def init(self):
         self.trend = self.I(lambda x: ema(x, self.trend_n), self.data.Close)

@@ -29,20 +29,19 @@ def atr(high, low, close, n):
 
 
 class NuggetStrategy(Strategy):
-    trend_n = 60
-    breakout_n = 18
+    trend_n = 70
+    breakout_n = 15
     exit_n = 12
-    atr_n = 7
+    atr_n = 5
 
     # ATR-based position sizing: risk X% of equity per trade
-    risk_pct = 0.015
+    risk_pct = 0.01         # risk 1% of equity per trade
     atr_mult = 0.8          # SL = atr_mult * ATR from entry
     min_vol = 0.002
-    max_vol = 0.08
+    max_vol = 0.16
 
-    rebalance_every = 6
-    rebalance_portion = 0.05
-    rebalance_topup = 0.01
+    rebalance_every = 8     # bars between scale-outs
+    rebalance_portion = 0.25  # close 25% of position on each scale-out
     
     def init(self):
         self.trend = self.I(lambda x: ema(x, self.trend_n), self.data.Close)
@@ -118,11 +117,6 @@ class NuggetStrategy(Strategy):
             # Periodic scale-out (aligned to bars IN trade, not global bar count)
             if self._bars_in_trade % self.rebalance_every == 0:
                 self.position.close(portion=self.rebalance_portion)
-                if self.rebalance_topup > 0:
-                    if self.position.is_long:
-                        self.buy(size=self.rebalance_topup)
-                    elif self.position.is_short:
-                        self.sell(size=self.rebalance_topup)
 
             return
 
