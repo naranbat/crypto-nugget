@@ -24,15 +24,15 @@ def atr(high, low, close, n):
 
 class NuggetStrategy(Strategy):
     fast_n = 17
-    slow_n = 20
-    atr_n = 53
+    slow_n = 19
+    atr_n = 55
 
-    band = 0.0034739190382566377
-    min_vol = 0.0019457069229671042
-    max_vol = 0.21170291407994768
+    band = 0.0023528948154033736
+    min_vol = 0.00200585265538528
+    max_vol = 0.2133227418254976
 
-    size = 0.9446983937981164
-    max_hold = 954
+    size = 0.9530683622184511
+    max_hold = 1073
 
     def init(self):
         self.fast = self.I(lambda x: np.array(ema(x, self.fast_n), copy=True), self.data.Close)

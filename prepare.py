@@ -3,7 +3,7 @@ import glob
 
 
 symbol = "BTCUSDT"
-interval = "1d"
+interval = "1h"
 market = "spot"
 dir_name = f"./data/spot/{symbol}"
 

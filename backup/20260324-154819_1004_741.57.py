@@ -19,20 +19,19 @@ def atr(high, low, close, n):
         ],
         axis=1,
     ).max(axis=1)
-    return np.asarray(tr.rolling(n).mean(), dtype=float)
+    return tr.rolling(n).mean().to_numpy(copy=True)
 
 
 class NuggetStrategy(Strategy):
-    fast_n = 17
-    slow_n = 20
-    atr_n = 53
+    fast_n = 7
+    slow_n = 93
+    band = 0.0027
 
-    band = 0.0034739190382566377
-    min_vol = 0.0019457069229671042
-    max_vol = 0.21170291407994768
+    atr_n = 19
+    min_vol = 0.002511868211301002
+    max_vol = 0.17125845010292987
 
-    size = 0.9446983937981164
-    max_hold = 954
+    size = 0.6
 
     def init(self):
         self.fast = self.I(lambda x: np.array(ema(x, self.fast_n), copy=True), self.data.Close)
@@ -43,7 +42,6 @@ class NuggetStrategy(Strategy):
             self.data.Low,
             self.data.Close,
         )
-        self._entry_bar = -1
 
     def next(self):
         price = self.data.Close[-1]
@@ -66,22 +64,13 @@ class NuggetStrategy(Strategy):
         if not self.position:
             if go_long:
                 self.buy(size=self.size)
-                self._entry_bar = len(self.data.Close) - 1
             elif go_short:
                 self.sell(size=self.size)
-                self._entry_bar = len(self.data.Close) - 1
-            return
-
-        bars_held = len(self.data.Close) - 1 - self._entry_bar
-        if bars_held >= self.max_hold:
-            self.position.close()
             return
 
         if self.position.is_long and go_short:
             self.position.close()
             self.sell(size=self.size)
-            self._entry_bar = len(self.data.Close) - 1
         elif self.position.is_short and go_long:
             self.position.close()
             self.buy(size=self.size)
-            self._entry_bar = len(self.data.Close) - 1

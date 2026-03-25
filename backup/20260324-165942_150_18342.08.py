@@ -19,20 +19,20 @@ def atr(high, low, close, n):
         ],
         axis=1,
     ).max(axis=1)
-    return np.asarray(tr.rolling(n).mean(), dtype=float)
+    return tr.rolling(n).mean().to_numpy(copy=True)
 
 
 class NuggetStrategy(Strategy):
-    fast_n = 17
-    slow_n = 20
-    atr_n = 53
+    fast_n = 22
+    slow_n = 25
+    atr_n = 41
 
-    band = 0.0034739190382566377
-    min_vol = 0.0019457069229671042
-    max_vol = 0.21170291407994768
+    band = 0.0026619494438690897
+    min_vol = 0.0
+    max_vol = 0.1575131575223597
 
-    size = 0.9446983937981164
-    max_hold = 954
+    size = 0.99
+    max_hold = 485
 
     def init(self):
         self.fast = self.I(lambda x: np.array(ema(x, self.fast_n), copy=True), self.data.Close)
