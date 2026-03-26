@@ -25,13 +25,11 @@ def rolling_prev_low(values, period):
 
 
 class NuggetStrategy(Strategy):
-    trend_period = 400
-    breakout_period = 156
-    atr_period = 22
-    stop_atr = 5.75
-    momentum_band = 0.012
-    atr_min_pct = 0.001
-    atr_max_pct = 0.055
+    trend_period = 380
+    breakout_period = 144
+    atr_period = 20
+    stop_atr = 6.0
+    momentum_band = 0.006
     size = 0.99
 
     def init(self):
@@ -54,15 +52,6 @@ class NuggetStrategy(Strategy):
         atr_now = float(self.atr[-1])
 
         if any(np.isnan(v) for v in (price, trend, breakout_high, breakout_low, atr_now)) or trend <= 0:
-            return
-
-        if price <= 0:
-            return
-
-        atr_pct = atr_now / price
-        if atr_pct < self.atr_min_pct or atr_pct > self.atr_max_pct:
-            if self.position:
-                self.position.close()
             return
 
         momentum = (price / trend) - 1.0

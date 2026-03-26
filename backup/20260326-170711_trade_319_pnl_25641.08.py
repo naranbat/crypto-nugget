@@ -26,12 +26,12 @@ def rolling_prev_low(values, period):
 
 class NuggetStrategy(Strategy):
     trend_period = 400
-    breakout_period = 156
-    atr_period = 22
-    stop_atr = 5.75
-    momentum_band = 0.012
-    atr_min_pct = 0.001
-    atr_max_pct = 0.055
+    breakout_period = 144
+    atr_period = 20
+    stop_atr = 6.0
+    momentum_band = 0.014
+    atr_min_pct = 0.0
+    atr_max_pct = 0.05
     size = 0.99
 
     def init(self):
