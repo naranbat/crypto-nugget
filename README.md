@@ -48,7 +48,7 @@ For each iteration:
 ---
 
 # Backup Rules
-- Archive EVERY attempt (including worse-performing ones).
+- Archive better result from previous one.
 - Never overwrite existing files.
 - Maintain full history of all strategies tested.
 
@@ -100,3 +100,13 @@ Prefer strategies with:
 - Acceptable worst out-of-sample drawdown,
 - Reasonable holdout performance,
 - And limited degradation under higher commission.
+
+
+## Final 
+Iteratively optimize the trading strategy by adjusting its hyperparameters for at least 8 consecutive iterations. After each iteration, evaluate performance based on stability and profitability.
+
+If no meaningful improvement is observed after these iterations, discard the current approach and initialize a new strategy. Repeat this process until a robust and stable strategy is achieved.
+
+Primary objective:
+- Achieve good profit and greater than previous one
+- Maintain consistency and avoid overfitting

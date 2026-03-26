@@ -30,25 +30,25 @@ def momentum_roc(values, period):
 
 
 class NuggetStrategy(Strategy):
-    fast_period = 24
-    slow_period = 60
-    trend_period = 174
-    breakout_period = 36
-    roc_period = 31
-    atr_period = 5
+    fast_period = 16
+    slow_period = 81
+    trend_period = 265
+    breakout_period = 53
+    roc_period = 21
+    atr_period = 7
 
-    long_roc_min = 0.042674971513559326
-    short_roc_max = 0.017588295030717717
+    long_roc_min = 0.030910146526815552
+    short_roc_max = 0.002975183102719159
 
-    min_atr_pct = 0.0001765524507551389
-    max_atr_pct = 0.0874639504875952
+    min_atr_pct = 0.003039753862515585
+    max_atr_pct = 0.0960871850666967
 
-    stop_atr = 3.8953710240824466
-    take_atr = 14.50718040747632
-    trail_atr = 2.61806722658279
+    stop_atr = 3.0095292196835226
+    take_atr = 11.32951745050069
+    trail_atr = 2.663241600062334
 
-    max_hold = 152
-    size = 0.9671353151536591
+    max_hold = 106
+    size = 0.9423033522082253
 
     def init(self):
         self.fast = self.I(lambda x: np.array(ema_np(x, self.fast_period), copy=True), self.data.Close)
