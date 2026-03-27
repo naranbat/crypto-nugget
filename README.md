@@ -110,3 +110,4 @@ If no meaningful improvement is observed after these iterations, discard the cur
 Primary objective:
 - Achieve good profit and greater than previous one
 - Maintain consistency and avoid overfitting
+- Give higher weight to the most recent PnL when evaluating performance

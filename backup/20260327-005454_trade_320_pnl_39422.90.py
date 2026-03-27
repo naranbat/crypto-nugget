@@ -29,21 +29,21 @@ def rolling_mean(values, period):
 
 
 class NuggetStrategy(Strategy):
-    trend_period = 405
+    trend_period = 404
     breakout_period = 140
     atr_period = 21
-    stop_atr = 5.52
-    momentum_band = 0.0143
-    atr_min_pct = 0.00132
-    atr_max_pct = 0.0514
-    size = 0.99999999
+    stop_atr = 5.54
+    momentum_band = 0.0142
+    atr_min_pct = 0.00134
+    atr_max_pct = 0.0516
+    size = 0.99999999999
 
-    vol_period = 60
-    vol_confirm = 2.04
-    vol_cont = 0.74
+    vol_period = 61
+    vol_confirm = 2.01
+    vol_cont = 0.73
     width_lookback = 114
-    width_comp_mult = 0.789
-    width_abs_max = 0.116
+    width_comp_mult = 0.788
+    width_abs_max = 0.114
 
     def init(self):
         self.trend = self.I(lambda x: np.array(ema_np(x, self.trend_period), copy=True), self.data.Close)
