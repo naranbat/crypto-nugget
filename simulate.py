@@ -4,63 +4,106 @@ import numpy as np
 from strategy import NuggetStrategy
 
 # ── Configuration ──────────────────────────────────────────────
-N_CHUNKS = 8          # number of time-based splits
-CASH     = 1000
-COMM     = 0.002
-MARGIN   = 1.0
+IS_MONTHS  = 6       # in-sample window
+OOS_MONTHS = 1       # out-of-sample step
+CASH       = 1000
+COMM       = 0.002
+MARGIN     = 1.0
 
-# ── Load data (DO NOT CHANGE) ─────────────────────────────────
+# ── Load data (DO NOT CHANGE) ──────────────────────────────────
 df = pd.read_parquet("./data/cache/normalized.parquet")
 df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+df.index = pd.to_datetime(df.index)
 
-# ── Split into roughly equal time chunks ───────────────────────
-# Keep chunks as pandas DataFrames, not NumPy arrays
-chunk_indices = np.array_split(np.arange(len(df)), N_CHUNKS)
-chunks = [df.iloc[idx].copy() for idx in chunk_indices if len(idx) > 0]
+# ── Build walk-forward windows ─────────────────────────────────
+def build_wf_windows(index, is_months, oos_months):
+    """
+    Rolls a fixed-length IS window forward by OOS_MONTHS each step.
+    Yields (is_start, is_end, oos_start, oos_end) as Timestamps.
+    """
+    windows = []
+    start = index[0]
+    end   = index[-1]
 
-# ── Run backtest on each chunk ─────────────────────────────────
+    while True:
+        is_start  = start
+        is_end    = is_start  + pd.DateOffset(months=is_months)
+        oos_start = is_end
+        oos_end   = oos_start + pd.DateOffset(months=oos_months)
+
+        if oos_end > end:
+            break
+
+        windows.append((is_start, is_end, oos_start, oos_end))
+        start = start + pd.DateOffset(months=oos_months)   # roll forward 1 month
+
+    return windows
+
+windows = build_wf_windows(df.index, IS_MONTHS, OOS_MONTHS)
+print(f"Total walk-forward folds: {len(windows)}")
+
+# ── Run walk-forward ───────────────────────────────────────────
 all_stats  = []
 all_trades = []
 
-for i, chunk in enumerate(chunks):
-    if len(chunk) < 2:
-        print(f"[Chunk {i+1}] skipped – too few rows")
+for i, (is_start, is_end, oos_start, oos_end) in enumerate(windows):
+    is_slice  = df[(df.index >= is_start)  & (df.index < is_end)].copy()
+    oos_slice = df[(df.index >= oos_start) & (df.index < oos_end)].copy()
+
+    if len(is_slice) < 2 or len(oos_slice) < 2:
+        print(f"[Fold {i+1}] skipped – too few rows")
         continue
 
-    bt = FractionalBacktest(
-        chunk,
-        NuggetStrategy,
-        cash=CASH,
-        commission=COMM,
-        margin=MARGIN,
-        trade_on_close=True,
-        finalize_trades=True,
+    # ── In-sample (fitting / optimisation would go here) ──────
+    bt_is = FractionalBacktest(
+        is_slice, NuggetStrategy,
+        cash=CASH, commission=COMM, margin=MARGIN,
+        trade_on_close=True, finalize_trades=True,
     )
-    stats = bt.run()
+    stats_is = bt_is.run()
 
-    # Collect key metrics
+    # ── Out-of-sample (evaluation) ─────────────────────────────
+    bt_oos = FractionalBacktest(
+        oos_slice, NuggetStrategy,
+        cash=CASH, commission=COMM, margin=MARGIN,
+        trade_on_close=True, finalize_trades=True,
+    )
+    stats_oos = bt_oos.run()
+
     row = {
-        "chunk":          i + 1,
-        "start":          chunk.index[0],
-        "end":            chunk.index[-1],
-        "rows":           len(chunk),
-        "return_pct":     stats["Return [%]"],
-        "sharpe":         stats.get("Sharpe Ratio", np.nan),
-        "max_drawdown":   stats.get("Max. Drawdown [%]", np.nan),
-        "win_rate":       stats.get("Win Rate [%]", np.nan),
-        "num_trades":     stats.get("# Trades", 0),
+        "fold":           i + 1,
+        "is_start":       is_start.date(),
+        "is_end":         is_end.date(),
+        "oos_start":      oos_start.date(),
+        "oos_end":        oos_end.date(),
+        "is_rows":        len(is_slice),
+        "oos_rows":       len(oos_slice),
+        # in-sample metrics
+        "is_return_pct":  stats_is["Return [%]"],
+        "is_sharpe":      stats_is.get("Sharpe Ratio",      np.nan),
+        "is_win_rate":    stats_is.get("Win Rate [%]",      np.nan),
+        "is_trades":      stats_is.get("# Trades",          0),
+        # out-of-sample metrics
+        "oos_return_pct": stats_oos["Return [%]"],
+        "oos_sharpe":     stats_oos.get("Sharpe Ratio",     np.nan),
+        "oos_max_dd":     stats_oos.get("Max. Drawdown [%]",np.nan),
+        "oos_win_rate":   stats_oos.get("Win Rate [%]",     np.nan),
+        "oos_trades":     stats_oos.get("# Trades",         0),
     }
     all_stats.append(row)
 
-    trades = stats._trades.copy()
+    trades = stats_oos._trades.copy()
     if not trades.empty:
-        trades["chunk"] = i + 1
+        trades["fold"] = i + 1
         all_trades.append(trades)
 
     print(f"\n{'='*60}")
-    print(f"  Chunk {i+1}  |  {row['start']}  →  {row['end']}  ({row['rows']} rows)")
+    print(f"  Fold {i+1}")
+    print(f"  IS : {is_start.date()} → {is_end.date()}  ({len(is_slice)} rows)")
+    print(f"  OOS: {oos_start.date()} → {oos_end.date()}  ({len(oos_slice)} rows)")
     print(f"{'='*60}")
-    print(stats.drop(['_strategy', '_equity_curve', '_trades']))
+    print(f"  [IS]  Return: {row['is_return_pct']:.2f}%  |  Sharpe: {row['is_sharpe']:.4f}  |  Win Rate: {row['is_win_rate']:.2f}%  |  Trades: {row['is_trades']}")
+    print(f"  [OOS] Return: {row['oos_return_pct']:.2f}%  |  Sharpe: {row['oos_sharpe']:.4f}  |  Win Rate: {row['oos_win_rate']:.2f}%  |  Trades: {row['oos_trades']}")
 
 # ── Also run on the FULL dataset for comparison ────────────────
 bt_full = FractionalBacktest(
@@ -74,28 +117,36 @@ stats_full = bt_full.run()
 summary = pd.DataFrame(all_stats)
 
 print(f"\n{'='*60}")
-print("  CHUNK SUMMARY")
+print("  WALK-FORWARD SUMMARY  (OOS metrics)")
 print(f"{'='*60}")
-print(summary.to_string(index=False))
+display_cols = ["fold", "oos_start", "oos_end", "oos_return_pct",
+                "oos_sharpe", "oos_max_dd", "oos_win_rate", "oos_trades"]
+print(summary[display_cols].to_string(index=False))
 
 print(f"\n{'='*60}")
-print("  CONSISTENCY CHECK")
+print("  CONSISTENCY CHECK  (OOS only)")
 print(f"{'='*60}")
-print(f"  Chunks profitable : {(summary['return_pct'] > 0).sum()} / {len(summary)}")
-print(f"  Avg return/chunk  : {summary['return_pct'].mean():.2f}%")
-print(f"  Std return/chunk  : {summary['return_pct'].std():.2f}%")
-print(f"  Avg Sharpe/chunk  : {summary['sharpe'].mean():.4f}")
-print(f"  Avg win rate      : {summary['win_rate'].mean():.2f}%")
+profitable = (summary["oos_return_pct"] > 0).sum()
+total      = len(summary)
+print(f"  Folds profitable  : {profitable} / {total}")
+print(f"  Avg OOS return    : {summary['oos_return_pct'].mean():.2f}%")
+print(f"  Std OOS return    : {summary['oos_return_pct'].std():.2f}%")
+print(f"  Avg OOS Sharpe    : {summary['oos_sharpe'].mean():.4f}")
+print(f"  Avg OOS win rate  : {summary['oos_win_rate'].mean():.2f}%")
+print(f"  IS/OOS corr       : {summary['is_return_pct'].corr(summary['oos_return_pct']):.4f}")
 print(f"  Full-data return  : {stats_full['Return [%]']:.2f}%")
 print(f"  Full-data Sharpe  : {stats_full.get('Sharpe Ratio', np.nan):.4f}")
 
-# ── Overfit warning ────────────────────────────────────────────
-profitable_chunks = (summary['return_pct'] > 0).sum()
-if profitable_chunks < len(summary) * 0.5:
+# ── Overfit / robustness warnings ─────────────────────────────
+is_oos_corr = summary["is_return_pct"].corr(summary["oos_return_pct"])
+
+if profitable < total * 0.5:
     print("\n  ⚠️  WARNING: Strategy is profitable in fewer than half the")
-    print("     chunks — likely overfitted to a specific regime.")
-elif summary['return_pct'].std() > abs(summary['return_pct'].mean()) * 2:
-    print("\n  ⚠️  WARNING: High variance across chunks — performance may")
-    print("     be regime-dependent rather than robust.")
+    print("     OOS folds — likely overfitted or regime-dependent.")
+elif summary["oos_return_pct"].std() > abs(summary["oos_return_pct"].mean()) * 2:
+    print("\n  ⚠️  WARNING: High OOS variance — performance may not be robust.")
+elif is_oos_corr < 0.3:
+    print("\n  ⚠️  WARNING: Low IS/OOS return correlation — in-sample results")
+    print("     are a poor predictor of out-of-sample performance.")
 else:
-    print("\n  ✅  Strategy shows reasonable consistency across chunks.")
+    print("\n  ✅  Strategy shows reasonable walk-forward consistency.")
