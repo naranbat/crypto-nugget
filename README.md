@@ -1,7 +1,7 @@
 # Crypto Nugget
 
 # Objective
-Continuously iterate and improve `strategy.py` by running simulations and archiving every attempt with its performance metrics.
+Continuously iterate and improve or recreate `strategy.py` by running simulations and archiving every attempt with its performance metrics.
 
 ---
 
@@ -27,30 +27,25 @@ For each iteration:
 
 3. Result Extraction
    - Parse the output and extract:
+     - Return
      - Trade count
-     - PnL
+     - Sharpe
 
 4. Archival
    - Ensure `backup/` directory exists (create if missing).
    - Save the exact `strategy.py` used in this iteration.
    - Filename format:
-     YYYYMMDD-HHMMSS_trade_<trade_count>_pnl_<pnl>.py
+     YYYYMMDD-HHMMSS_<return>.py
    - Example:
-     20260323-141530_trade_77_pnl_332.02.py
+     20260323-141530_+332.02.py
 
-5. Logging (optional but recommended)
-   - Print or log:
-     - Timestamp
-     - Trade count
-     - PnL
-     - Short description of strategy idea
 
 ---
 
 # Backup Rules
 - Archive better result from previous one.
 - Never overwrite existing files.
-- Maintain full history of all strategies tested.
+
 
 ---
 
