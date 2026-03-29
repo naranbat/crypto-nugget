@@ -83,23 +83,22 @@ def supertrend_direction(high, low, close, period, multiplier):
 
 
 class NuggetStrategy(Strategy):
-    st_period = 19
-    st_mult = 6.65
+    # Slow SuperTrend — primary trend direction (proven best params)
+    st_slow_period = 19
+    st_slow_mult = 6.65
+    # Fast SuperTrend — momentum/entry quality confirmation
     st_fast_period = 10
     st_fast_mult = 3.0
+
     ema_period = 60
     ema_buffer = 0.013
     rsi_long = 64.04350789001414
     rsi_short = 34.0
-    # Time-based stop: exit losing position after this many bars
-    max_loss_bars = 500
-    # Stall stop: exit if price has been below entry for this many consecutive bars
-    stall_bars = 9999  # effectively disabled
     size = 0.999999
 
     def init(self):
-        self.st_dir = self.I(
-            lambda h, l, c: np.array(supertrend_direction(h, l, c, self.st_period, self.st_mult), copy=True),
+        self.st_slow_dir = self.I(
+            lambda h, l, c: np.array(supertrend_direction(h, l, c, self.st_slow_period, self.st_slow_mult), copy=True),
             self.data.High, self.data.Low, self.data.Close,
         )
         self.st_fast_dir = self.I(
@@ -108,68 +107,40 @@ class NuggetStrategy(Strategy):
         )
         self.ema_trend = self.I(lambda c: np.array(ema(c, self.ema_period), copy=True), self.data.Close)
         self.rsi_ind = self.I(lambda c: np.array(rsi(c, 20), copy=True), self.data.Close)
-        self.atr14_ind = self.I(
-            lambda h, l, c: np.array(atr(h, l, c, 14), copy=True),
-            self.data.High, self.data.Low, self.data.Close,
-        )
-        self._hold_bars = 0
-        self._entry_price = np.nan
-        self._below_entry_bars = 0   # consecutive bars below entry (for longs)
-        self._above_entry_bars = 0   # consecutive bars above entry (for shorts)
 
     def next(self):
         price = float(self.data.Close[-1])
-        st = float(self.st_dir[-1])
-        stf = float(self.st_fast_dir[-1])
+        slow_dir = float(self.st_slow_dir[-1])
+        fast_dir = float(self.st_fast_dir[-1])
         ema_now = float(self.ema_trend[-1])
         rsi_now = float(self.rsi_ind[-1])
-        atr_now = float(self.atr14_ind[-1])
 
-        if any(np.isnan(v) for v in (price, st, stf, ema_now, rsi_now, atr_now)):
+        if any(np.isnan(v) for v in (price, slow_dir, fast_dir, ema_now, rsi_now)):
             return
         if price <= 0.0 or ema_now <= 0.0:
             return
 
-        long_signal = st > 0.0 and stf > 0.0 and price > ema_now * (1.0 + self.ema_buffer) and rsi_now > self.rsi_long
-        short_signal = st < 0.0 and stf < 0.0 and price < ema_now * (1.0 - self.ema_buffer) and rsi_now < self.rsi_short
+        long_signal = (
+            slow_dir > 0.0
+            and fast_dir > 0.0
+            and price > ema_now * (1.0 + self.ema_buffer)
+            and rsi_now > self.rsi_long
+        )
+        short_signal = (
+            slow_dir < 0.0
+            and fast_dir < 0.0
+            and price < ema_now * (1.0 - self.ema_buffer)
+            and rsi_now < self.rsi_short
+        )
 
-        if self.position.is_long:
-            self._hold_bars += 1
-            # No time stop for longs — let them run to opposite signal
-            if short_signal:
-                self._hold_bars = 0
-                self._entry_price = np.nan
-                self._below_entry_bars = 0
-                self.position.close()
-                self.sell(size=self.size)
-                self._entry_price = price
-            return
-
-        if self.position.is_short:
-            self._hold_bars += 1
-            if not np.isnan(self._entry_price) and price > self._entry_price:
-                self._above_entry_bars += 1
-            else:
-                self._above_entry_bars = 0
-            time_stop = (self._hold_bars >= self.max_loss_bars
-                         and not np.isnan(self._entry_price)
-                         and price > self._entry_price)
-            if long_signal or time_stop:
-                self._hold_bars = 0
-                self._entry_price = np.nan
-                self._above_entry_bars = 0
-                self.position.close()
-                if long_signal:
-                    self.buy(size=self.size)
-                    self._entry_price = price
-            return
-
-        self._hold_bars = 0
-        self._below_entry_bars = 0
-        self._above_entry_bars = 0
         if long_signal:
-            self.buy(size=self.size)
-            self._entry_price = price
-        elif short_signal:
+            if not self.position or not self.position.is_long:
+                if self.position:
+                    self.position.close()
+                self.buy(size=self.size)
+            return
+
+        if short_signal and (not self.position or not self.position.is_short):
+            if self.position:
+                self.position.close()
             self.sell(size=self.size)
-            self._entry_price = price

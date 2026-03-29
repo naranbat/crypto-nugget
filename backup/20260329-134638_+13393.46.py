@@ -93,8 +93,6 @@ class NuggetStrategy(Strategy):
     rsi_short = 34.0
     # Time-based stop: exit losing position after this many bars
     max_loss_bars = 500
-    # Stall stop: exit if price has been below entry for this many consecutive bars
-    stall_bars = 9999  # effectively disabled
     size = 0.999999
 
     def init(self):
@@ -108,14 +106,8 @@ class NuggetStrategy(Strategy):
         )
         self.ema_trend = self.I(lambda c: np.array(ema(c, self.ema_period), copy=True), self.data.Close)
         self.rsi_ind = self.I(lambda c: np.array(rsi(c, 20), copy=True), self.data.Close)
-        self.atr14_ind = self.I(
-            lambda h, l, c: np.array(atr(h, l, c, 14), copy=True),
-            self.data.High, self.data.Low, self.data.Close,
-        )
         self._hold_bars = 0
         self._entry_price = np.nan
-        self._below_entry_bars = 0   # consecutive bars below entry (for longs)
-        self._above_entry_bars = 0   # consecutive bars above entry (for shorts)
 
     def next(self):
         price = float(self.data.Close[-1])
@@ -123,9 +115,8 @@ class NuggetStrategy(Strategy):
         stf = float(self.st_fast_dir[-1])
         ema_now = float(self.ema_trend[-1])
         rsi_now = float(self.rsi_ind[-1])
-        atr_now = float(self.atr14_ind[-1])
 
-        if any(np.isnan(v) for v in (price, st, stf, ema_now, rsi_now, atr_now)):
+        if any(np.isnan(v) for v in (price, st, stf, ema_now, rsi_now)):
             return
         if price <= 0.0 or ema_now <= 0.0:
             return
@@ -135,29 +126,27 @@ class NuggetStrategy(Strategy):
 
         if self.position.is_long:
             self._hold_bars += 1
-            # No time stop for longs — let them run to opposite signal
-            if short_signal:
+            # Time-stop: exit only if position is currently at a loss
+            time_stop = (self._hold_bars >= self.max_loss_bars
+                         and not np.isnan(self._entry_price)
+                         and price < self._entry_price)
+            if short_signal or time_stop:
                 self._hold_bars = 0
                 self._entry_price = np.nan
-                self._below_entry_bars = 0
                 self.position.close()
-                self.sell(size=self.size)
-                self._entry_price = price
+                if short_signal:
+                    self.sell(size=self.size)
+                    self._entry_price = price
             return
 
         if self.position.is_short:
             self._hold_bars += 1
-            if not np.isnan(self._entry_price) and price > self._entry_price:
-                self._above_entry_bars += 1
-            else:
-                self._above_entry_bars = 0
             time_stop = (self._hold_bars >= self.max_loss_bars
                          and not np.isnan(self._entry_price)
                          and price > self._entry_price)
             if long_signal or time_stop:
                 self._hold_bars = 0
                 self._entry_price = np.nan
-                self._above_entry_bars = 0
                 self.position.close()
                 if long_signal:
                     self.buy(size=self.size)
@@ -165,8 +154,6 @@ class NuggetStrategy(Strategy):
             return
 
         self._hold_bars = 0
-        self._below_entry_bars = 0
-        self._above_entry_bars = 0
         if long_signal:
             self.buy(size=self.size)
             self._entry_price = price
